@@ -1,0 +1,29 @@
+/* Base reset. All PulsePoll design tokens, typography and
+   component styling live in App.css — this file only
+   normalizes the document before the app mounts. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+}
