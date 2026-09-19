@@ -112,7 +112,10 @@ function App() {
   const [pollForm, setPollForm] = useState({
     question: "",
     options: ["", ""],
+    imageUrls: ["", ""],
   });
+
+  const [showImages, setShowImages] = useState(false);
 
   // --------------------------------------------------
   // INITIAL LOAD & DEEP LINK HANDLING
@@ -629,10 +632,8 @@ function App() {
 
     setPollForm({
       ...pollForm,
-      options: [
-        ...pollForm.options,
-        "",
-      ],
+      options: [...pollForm.options, ""],
+      imageUrls: [...(pollForm.imageUrls || []), ""],
     });
   }
 
@@ -644,28 +645,28 @@ function App() {
       return;
     }
 
-    const newOptions =
-      pollForm.options.filter(
-        (_, i) => i !== index
-      );
+    const newOptions = pollForm.options.filter((_, i) => i !== index);
+    const newImageUrls = (pollForm.imageUrls || []).filter((_, i) => i !== index);
 
     setPollForm({
       ...pollForm,
       options: newOptions,
+      imageUrls: newImageUrls,
     });
   }
 
   function updateOption(index, value) {
-    const newOptions = [
-      ...pollForm.options,
-    ];
-
+    const newOptions = [...pollForm.options];
     newOptions[index] = value;
+    setPollForm({ ...pollForm, options: newOptions });
+  }
 
-    setPollForm({
-      ...pollForm,
-      options: newOptions,
-    });
+  function updateImageUrl(index, value) {
+    const newUrls = [...(pollForm.imageUrls || [])];
+    // Ensure array is long enough
+    while (newUrls.length <= index) newUrls.push("");
+    newUrls[index] = value;
+    setPollForm({ ...pollForm, imageUrls: newUrls });
   }
 
   // --------------------------------------------------
@@ -724,6 +725,7 @@ function App() {
           body: JSON.stringify({
             question,
             options: cleanOptions,
+            imageUrls: (pollForm.imageUrls || []).map((u) => u.trim()),
           }),
         }
       );
@@ -733,7 +735,9 @@ function App() {
       setPollForm({
         question: "",
         options: ["", ""],
+        imageUrls: ["", ""],
       });
+      setShowImages(false);
 
       showSuccess(
         "Poll created successfully!"
@@ -2410,6 +2414,22 @@ function App() {
 
               </div>
 
+              {/* Image URL toggle */}
+              <div className="img-toggle-row">
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={showImages}
+                    onChange={(e) => setShowImages(e.target.checked)}
+                  />
+                  <span className="slider" />
+                </label>
+                <label htmlFor="img-toggle" style={{ marginTop: 0 }}>
+                  Add images to options
+                </label>
+                <span className="img-toggle-hint">Optional — paste any public image URL</span>
+              </div>
+
               <div className="option-list">
 
                 {pollForm.options.map(
@@ -2418,46 +2438,47 @@ function App() {
                       className="option-input-row"
                       key={index}
                     >
-
                       <span className="option-number">
-                        {String(
-                          index + 1
-                        ).padStart(
-                          2,
-                          "0"
-                        )}
+                        {String(index + 1).padStart(2, "0")}
                       </span>
 
-                      <input
-                        type="text"
-                        placeholder={`Option ${
-                          index + 1
-                        }`}
-                        value={option}
-                        onChange={(e) =>
-                          updateOption(
-                            index,
-                            e.target.value
-                          )
-                        }
-                        required
-                      />
+                      <div className="option-input-col">
+                        <input
+                          type="text"
+                          placeholder={`Option ${index + 1}`}
+                          value={option}
+                          onChange={(e) => updateOption(index, e.target.value)}
+                          required
+                        />
 
-                      {pollForm
-                        .options
-                        .length >
-                        2 && (
+                        {showImages && (
+                          <div className="option-img-row">
+                            <input
+                              type="url"
+                              className="option-img-input"
+                              placeholder="Image URL (optional)"
+                              value={(pollForm.imageUrls || [])[index] || ""}
+                              onChange={(e) => updateImageUrl(index, e.target.value)}
+                            />
+                            {(pollForm.imageUrls || [])[index]?.trim() && (
+                              <img
+                                src={(pollForm.imageUrls || [])[index]}
+                                alt="preview"
+                                className="option-thumb"
+                                onError={(e) => { e.target.style.display = "none"; }}
+                                onLoad={(e) => { e.target.style.display = "block"; }}
+                              />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {pollForm.options.length > 2 && (
                         <button
                           type="button"
                           className="remove-button"
-                          onClick={() =>
-                            removeOption(
-                              index
-                            )
-                          }
-                          aria-label={`Remove option ${
-                            index + 1
-                          }`}
+                          onClick={() => removeOption(index)}
+                          aria-label={`Remove option ${index + 1}`}
                         >
                           ×
                         </button>
@@ -2823,37 +2844,31 @@ function App() {
                 <div className="vote-options">
 
                   {selectedPoll.options?.map(
-                    (
-                      option,
-                      index
-                    ) => (
+                    (option, index) => (
                       <button
                         key={index}
                         type="button"
                         className={
-                          selectedOption ===
-                          index
+                          selectedOption === index
                             ? "vote-option selected"
                             : "vote-option"
                         }
-                        onClick={() =>
-                          setSelectedOption(
-                            index
-                          )
-                        }
+                        onClick={() => setSelectedOption(index)}
                       >
-
                         <span className="radio">
-                          {selectedOption ===
-                          index
-                            ? "✓"
-                            : ""}
+                          {selectedOption === index ? "✓" : ""}
                         </span>
 
-                        <span>
-                          {option}
-                        </span>
+                        {selectedPoll.imageUrls?.[index]?.trim() && (
+                          <img
+                            src={selectedPoll.imageUrls[index]}
+                            alt={option}
+                            className="vote-option-img"
+                            onError={(e) => { e.target.style.display = "none"; }}
+                          />
+                        )}
 
+                        <span>{option}</span>
                       </button>
                     )
                   )}
@@ -2965,38 +2980,34 @@ function App() {
                       index
                     ] || 0;
 
+                  const isLeading = index === leadingIndex && total > 0;
+
                   return (
-                    <div
-                      className="result-row"
-                      key={index}
-                    >
+                    <div className="result-row" key={index}>
 
                       <div className="result-label">
-
                         <span>
+                          {selectedPoll.imageUrls?.[index]?.trim() && (
+                            <img
+                              src={selectedPoll.imageUrls[index]}
+                              alt={option}
+                              className="result-thumb"
+                              onError={(e) => { e.target.style.display = "none"; }}
+                            />
+                          )}
                           {option}
+                          {isLeading && (
+                            <span className="leading-badge">Leading</span>
+                          )}
                         </span>
-
-                        <span>
-                          {votes} ·{" "}
-                          {
-                            percentage
-                          }
-                          %
-                        </span>
-
+                        <span>{votes} · {percentage}%</span>
                       </div>
 
                       <div className="progress-bar">
-
                         <div
-                          className="progress-fill"
-                          style={{
-                            width:
-                              `${percentage}%`,
-                          }}
+                          className={`progress-fill${isLeading ? " leading" : ""}`}
+                          style={{ width: `${percentage}%` }}
                         />
-
                       </div>
 
                     </div>

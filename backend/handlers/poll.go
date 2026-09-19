@@ -15,8 +15,9 @@ import (
 )
 
 type CreatePollRequest struct {
-	Question string   `json:"question"`
-	Options  []string `json:"options"`
+	Question  string   `json:"question"`
+	Options   []string `json:"options"`
+	ImageUrls []string `json:"imageUrls"`
 }
 
 // --------------------------------------------------
@@ -126,10 +127,22 @@ func CreatePoll(c *gin.Context) {
 
 	votes := make([]int, len(cleanOptions))
 
+	// Build optional image URL slice aligned to options
+	var cleanImageUrls []string
+	if len(request.ImageUrls) > 0 {
+		cleanImageUrls = make([]string, len(cleanOptions))
+		for i, imgUrl := range request.ImageUrls {
+			if i < len(cleanOptions) {
+				cleanImageUrls[i] = strings.TrimSpace(imgUrl)
+			}
+		}
+	}
+
 	poll := models.Poll{
 		ID:        bson.NewObjectID(),
 		Question:  request.Question,
 		Options:   cleanOptions,
+		ImageUrls: cleanImageUrls,
 		Votes:     votes,
 		Voters:    []string{},
 		CreatedBy: userIDString,
