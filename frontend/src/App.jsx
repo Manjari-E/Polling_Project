@@ -750,6 +750,62 @@ function App() {
   }
 
   // --------------------------------------------------
+  // SHARE & COPY LINK
+  // --------------------------------------------------
+
+  function getPollShareUrl(pollId) {
+    const base = window.location.origin + window.location.pathname;
+    return `${base.replace(/\/$/, "")}/?poll=${pollId}`;
+  }
+
+  function copyPollLink(pollId, e) {
+    if (e && e.stopPropagation) {
+      e.stopPropagation();
+    }
+
+    const id = pollId || selectedPoll?.id;
+    if (!id) return;
+
+    const url = getPollShareUrl(id);
+
+    const onCopied = () => {
+      setCopiedLink(id);
+      showSuccess("Poll link copied to clipboard!");
+      setTimeout(() => {
+        setCopiedLink(null);
+      }, 2500);
+    };
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(url)
+        .then(onCopied)
+        .catch(() => {
+          fallbackCopyText(url, onCopied);
+        });
+    } else {
+      fallbackCopyText(url, onCopied);
+    }
+  }
+
+  function fallbackCopyText(text, onCopied) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand("copy");
+      if (onCopied) onCopied();
+    } catch {
+      showError("Please copy the poll link manually.");
+    }
+    document.body.removeChild(textArea);
+  }
+
+  // --------------------------------------------------
   // OPEN POLL
   // --------------------------------------------------
 
@@ -1313,6 +1369,110 @@ function App() {
   }
 
   // --------------------------------------------------
+  // SHARE MODAL
+  // --------------------------------------------------
+
+  function renderShareModal() {
+    if (!shareModalPoll) return null;
+
+    const shareUrl = getPollShareUrl(shareModalPoll.id);
+    const isCopied = copiedLink === shareModalPoll.id;
+
+    return (
+      <div
+        className="modal-backdrop"
+        onClick={() => setShareModalPoll(null)}
+      >
+        <div
+          className="modal-card share-modal"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="modal-header">
+            <div>
+              <span className="eyebrow">LIVE AUDIENCE SHARE</span>
+              <h2>{shareModalPoll.question}</h2>
+            </div>
+
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setShareModalPoll(null)}
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+          </div>
+
+          <p className="share-description">
+            Anyone with this link or QR code can vote live from any phone or computer with zero login required.
+          </p>
+
+          <div className="share-link-box">
+            <input
+              type="text"
+              readOnly
+              value={shareUrl}
+              className="share-link-input"
+              onClick={(e) => e.target.select()}
+            />
+            <button
+              type="button"
+              className={
+                isCopied
+                  ? "primary-button share-copy-btn copied"
+                  : "primary-button share-copy-btn"
+              }
+              onClick={() => copyPollLink(shareModalPoll.id)}
+            >
+              {isCopied ? "Copied! ✓" : "Copy Link"}
+            </button>
+          </div>
+
+          <div className="share-qr-section">
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                shareUrl
+              )}`}
+              alt="Poll QR Code"
+              className="share-qr-img"
+            />
+            <span className="share-qr-hint">
+              📱 Scan with phone camera to vote directly
+            </span>
+          </div>
+
+          {typeof navigator !== "undefined" && navigator.share && (
+            <button
+              type="button"
+              className="secondary-button full"
+              style={{ marginBottom: "12px" }}
+              onClick={() => {
+                navigator
+                  .share({
+                    title: shareModalPoll.question,
+                    text: `Vote on: "${shareModalPoll.question}"`,
+                    url: shareUrl,
+                  })
+                  .catch(() => {});
+              }}
+            >
+              📱 Share via Apps (WhatsApp, Telegram, etc.)
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="secondary-button full"
+            onClick={() => setShareModalPoll(null)}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------
   // NAVBAR
   // --------------------------------------------------
 
@@ -1333,8 +1493,12 @@ function App() {
         <button
           className="nav-logo"
           onClick={() => {
-            setPage("dashboard");
-            loadPolls(token);
+            if (token) {
+              setPage("dashboard");
+              loadPolls(token);
+            } else {
+              setPage("login");
+            }
           }}
           aria-label="Go to PulsePoll dashboard"
         >
@@ -1355,32 +1519,36 @@ function App() {
 
         <nav className="nav-links">
 
-          <button
-            className={
-              page === "dashboard"
-                ? "nav-active"
-                : ""
-            }
-            onClick={() => {
-              setPage("dashboard");
-              loadPolls(token);
-            }}
-          >
-            Polls
-          </button>
+          {token && (
+            <>
+              <button
+                className={
+                  page === "dashboard"
+                    ? "nav-active"
+                    : ""
+                }
+                onClick={() => {
+                  setPage("dashboard");
+                  loadPolls(token);
+                }}
+              >
+                Polls
+              </button>
 
-          <button
-            className={
-              page === "create"
-                ? "nav-active"
-                : ""
-            }
-            onClick={() =>
-              setPage("create")
-            }
-          >
-            Create Poll
-          </button>
+              <button
+                className={
+                  page === "create"
+                    ? "nav-active"
+                    : ""
+                }
+                onClick={() =>
+                  setPage("create")
+                }
+              >
+                Create Poll
+              </button>
+            </>
+          )}
 
           <span
             className={
@@ -1398,74 +1566,95 @@ function App() {
 
         </nav>
 
-        <div className="profile-wrap">
+        {token ? (
+          <div className="profile-wrap">
 
-          <button
-            className="profile-trigger"
-            onClick={() =>
-              setProfileOpen(
-                (open) => !open
-              )
-            }
-            aria-expanded={
-              profileOpen
-            }
-          >
-            <span className="avatar">
-              {initial}
-            </span>
+            <button
+              className="profile-trigger"
+              onClick={() =>
+                setProfileOpen(
+                  (open) => !open
+                )
+              }
+              aria-expanded={
+                profileOpen
+              }
+            >
+              <span className="avatar">
+                {initial}
+              </span>
 
-            <span className="profile-copy">
-              <strong>
-                {displayName}
-              </strong>
+              <span className="profile-copy">
+                <strong>
+                  {displayName}
+                </strong>
 
-              <small>
-                Account
-              </small>
-            </span>
+                <small>
+                  Account
+                </small>
+              </span>
 
-            <span className="chevron">
-              ⌄
-            </span>
-          </button>
+              <span className="chevron">
+                ⌄
+              </span>
+            </button>
 
-          {profileOpen && (
-            <div className="profile-menu">
+            {profileOpen && (
+              <div className="profile-menu">
 
-              <div className="profile-menu-head">
+                <div className="profile-menu-head">
 
-                <span className="avatar large">
-                  {initial}
-                </span>
-
-                <div>
-                  <strong>
-                    {displayName}
-                  </strong>
-
-                  <span>
-                    {user?.email ||
-                      "Signed in"}
+                  <span className="avatar large">
+                    {initial}
                   </span>
+
+                  <div>
+                    <strong>
+                      {displayName}
+                    </strong>
+
+                    <span>
+                      {user?.email ||
+                        "Signed in"}
+                    </span>
+                  </div>
+
                 </div>
 
+                <div className="profile-menu-divider" />
+
+                <button
+                  className="profile-logout"
+                  onClick={logout}
+                >
+                  <span>↪</span>
+                  Log out
+                </button>
+
               </div>
+            )}
 
-              <div className="profile-menu-divider" />
-
-              <button
-                className="profile-logout"
-                onClick={logout}
-              >
-                <span>↪</span>
-                Log out
-              </button>
-
-            </div>
-          )}
-
-        </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              type="button"
+              className="secondary-button"
+              style={{ padding: "6px 12px", fontSize: "13px" }}
+              onClick={() => setPage("login")}
+            >
+              Log in
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              style={{ padding: "6px 14px", fontSize: "13px" }}
+              onClick={() => setPage("signup")}
+            >
+              Sign up
+            </button>
+          </div>
+        )}
 
       </header>
     );
@@ -1990,10 +2179,10 @@ function App() {
                             </div>
                           )}
 
-                        <div className="card-actions">
+                        <div className="card-actions-row">
 
                           <button
-                            className="secondary-button full"
+                            className="secondary-button main-action"
                             onClick={() =>
                               openPoll(
                                 poll.id
@@ -2003,13 +2192,85 @@ function App() {
                             View results
                           </button>
 
+                          <button
+                            className={
+                              copiedLink === poll.id
+                                ? "card-share-btn copied"
+                                : "card-share-btn"
+                            }
+                            onClick={(e) =>
+                              copyPollLink(
+                                poll.id,
+                                e
+                              )
+                            }
+                            title="Copy link to clipboard"
+                          >
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              {copiedLink === poll.id ? (
+                                <polyline points="20 6 9 17 4 12" />
+                              ) : (
+                                <>
+                                  <rect
+                                    x="9"
+                                    y="9"
+                                    width="13"
+                                    height="13"
+                                    rx="2"
+                                    ry="2"
+                                  />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </>
+                              )}
+                            </svg>
+                            <span>
+                              {copiedLink === poll.id
+                                ? "Copied! ✓"
+                                : "Copy Link"}
+                            </span>
+                          </button>
+
+                          <button
+                            className="icon-btn-compact"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShareModalPoll(poll);
+                            }}
+                            title="QR Code & Audience Sharing"
+                            aria-label="Share QR code"
+                          >
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <rect x="3" y="3" width="7" height="7" />
+                              <rect x="14" y="3" width="7" height="7" />
+                              <rect x="14" y="14" width="7" height="7" />
+                              <rect x="3" y="14" width="7" height="7" />
+                            </svg>
+                          </button>
+
                           {poll.status ===
                             "active" &&
                             isCreator(
                               poll
                             ) && (
                               <button
-                                className="danger-button full"
+                                className="danger-button"
+                                style={{ padding: "8px 12px" }}
                                 onClick={() =>
                                   closePoll(
                                     poll.id
@@ -2019,7 +2280,7 @@ function App() {
                                   loading
                                 }
                               >
-                                Close poll
+                                Close
                               </button>
                             )}
 
@@ -2342,11 +2603,15 @@ function App() {
             <button
               className="back-button"
               onClick={() => {
-                setPage("dashboard");
-                loadPolls(token);
+                if (token) {
+                  setPage("dashboard");
+                  loadPolls(token);
+                } else {
+                  setPage("login");
+                }
               }}
             >
-              ← Back to polls
+              ← {token ? "Back to polls" : "PulsePoll Home"}
             </button>
             <div className="empty-state polished-empty" style={{ marginTop: "24px" }}>
               <div className="empty-icon">◉</div>
@@ -2355,11 +2620,15 @@ function App() {
               <button
                 className="primary-button"
                 onClick={() => {
-                  setPage("dashboard");
-                  loadPolls(token);
+                  if (token) {
+                    setPage("dashboard");
+                    loadPolls(token);
+                  } else {
+                    setPage("login");
+                  }
                 }}
               >
-                Return to Dashboard
+                {token ? "Return to Dashboard" : "Go to Sign In"}
               </button>
             </div>
           </main>
@@ -2397,12 +2666,30 @@ function App() {
           <button
             className="back-button"
             onClick={() => {
-              setPage("dashboard");
-              loadPolls(token);
+              if (token) {
+                setPage("dashboard");
+                loadPolls(token);
+              } else {
+                setPage("login");
+              }
             }}
           >
-            ← Back to polls
+            ← {token ? "Back to polls" : "PulsePoll Home"}
           </button>
+
+          {!token && (
+            <div className="guest-hero-banner">
+              <span>👋 <strong>Audience Live Voting:</strong> You can vote directly. Results update live!</span>
+              <button
+                type="button"
+                className="secondary-button"
+                style={{ padding: "4px 12px", fontSize: "12px" }}
+                onClick={() => setPage("signup")}
+              >
+                Create your own poll →
+              </button>
+            </div>
+          )}
 
           <div className="poll-detail-card professional-detail">
 
@@ -2446,6 +2733,83 @@ function App() {
                 selectedPoll.question
               }
             </h1>
+
+            <div className="poll-share-bar">
+              <button
+                type="button"
+                className={
+                  copiedLink === selectedPoll.id
+                    ? "share-action-btn copied"
+                    : "share-action-btn"
+                }
+                onClick={() => copyPollLink(selectedPoll.id)}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {copiedLink === selectedPoll.id ? (
+                    <polyline points="20 6 9 17 4 12" />
+                  ) : (
+                    <>
+                      <rect
+                        x="9"
+                        y="9"
+                        width="13"
+                        height="13"
+                        rx="2"
+                        ry="2"
+                      />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </>
+                  )}
+                </svg>
+                <span>
+                  {copiedLink === selectedPoll.id
+                    ? "Link Copied! ✓"
+                    : "Copy Share Link"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                className="share-action-btn secondary"
+                onClick={() => setShareModalPoll(selectedPoll)}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+                <span>QR Code & Audience</span>
+              </button>
+            </div>
+
+            {selectedPoll.hasVoted && (
+              <div className="voted-badge-box">
+                <div className="voted-badge-icon">✓</div>
+                <div className="voted-badge-text">
+                  <h4>Your vote is recorded!</h4>
+                  <p>
+                    You have already voted on this poll. Live results are updating below in real time.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="detail-divider" />
 
@@ -2496,21 +2860,31 @@ function App() {
 
                 </div>
 
-                <button
-                  className="primary-button full vote-submit"
-                  onClick={
-                    votePoll
-                  }
-                  disabled={
-                    loading ||
-                    selectedOption ===
-                      null
-                  }
-                >
-                  {loading
-                    ? "Submitting..."
-                    : "Submit Vote"}
-                </button>
+                {selectedPoll.hasVoted ? (
+                  <button
+                    className="secondary-button full"
+                    disabled
+                    style={{ opacity: 0.85, cursor: "default" }}
+                  >
+                    ✓ Your Vote is Recorded
+                  </button>
+                ) : (
+                  <button
+                    className="primary-button full vote-submit"
+                    onClick={
+                      votePoll
+                    }
+                    disabled={
+                      loading ||
+                      selectedOption ===
+                        null
+                    }
+                  >
+                    {loading
+                      ? "Submitting..."
+                      : "Submit Vote"}
+                  </button>
+                )}
 
               </>
             ) : (
@@ -2663,6 +3037,10 @@ function App() {
   // --------------------------------------------------
 
   function renderApp() {
+    if (page === "poll") {
+      return renderPoll();
+    }
+
     if (!token) {
       if (page === "signup") {
         return renderSignup();
@@ -2673,10 +3051,6 @@ function App() {
 
     if (page === "create") {
       return renderCreatePoll();
-    }
-
-    if (page === "poll") {
-      return renderPoll();
     }
 
     return renderDashboard();
@@ -2701,6 +3075,7 @@ function App() {
       )}
 
       {renderApp()}
+      {renderShareModal()}
     </>
   );
 }
