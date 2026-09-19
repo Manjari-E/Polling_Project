@@ -10,7 +10,18 @@ import "./App.css";
  * In production, requests go through the same Vercel domain.
  */
 
-const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const BACKEND_TUNNEL_URL = "https://legislate-geiger-litigator.ngrok-free.dev";
+const API_URL = (import.meta.env.VITE_API_URL || BACKEND_TUNNEL_URL).replace(/\/$/, "");
+
+// Auto-inject ngrok header so browser/fetch requests pass through ngrok free tunnel smoothly
+const _origFetch = window.fetch;
+window.fetch = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  if (!headers.has("ngrok-skip-browser-warning")) {
+    headers.set("ngrok-skip-browser-warning", "69420");
+  }
+  return _origFetch(url, { ...options, headers });
+};
 
 const WS_URL = (() => {
   if (import.meta.env.VITE_WS_URL) {
