@@ -425,9 +425,9 @@ function App() {
           "Backend server is offline or unreachable. Please start the Go backend server."
         );
       }
-      if (response.status === 404) {
+      if (response.status === 404 || response.status === 405) {
         throw new Error(
-          "API route not found (404). Ensure the backend is running and the proxy is configured."
+          "Backend server is not connected or unreachable. Ensure your backend is running and VITE_API_URL is configured."
         );
       }
       throw new Error(`Server returned status ${response.status}.`);
