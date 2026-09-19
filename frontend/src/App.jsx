@@ -3205,87 +3205,51 @@ function App() {
           </div>
 
           <p className="google-modal-subtitle">
-            Select a Google account to sign in immediately, or enter your Google address.
+            Enter your Google email address to sign in to PulsePoll.
           </p>
 
-          <div className="google-account-list">
-            <button
-              type="button"
-              className="google-account-item"
-              disabled={loading}
-              onClick={() =>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (customGoogleEmail.trim()) {
                 handleGoogleLogin({
-                  email: "maniellu06@gmail.com",
-                  name: "MANI",
-                  avatar: "https://lh3.googleusercontent.com/a/default-user=s96-c",
-                })
+                  email: customGoogleEmail.trim(),
+                  name: customGoogleEmail.split("@")[0],
+                });
               }
-            >
-              <div className="google-account-avatar">M</div>
-              <div className="google-account-info">
-                <span className="google-account-name">MANI</span>
-                <span className="google-account-email">maniellu06@gmail.com</span>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              className="google-account-item"
-              disabled={loading}
-              onClick={() =>
-                handleGoogleLogin({
-                  email: "manjari2700@gmail.com",
-                  name: "Manjari",
-                  avatar: "https://lh3.googleusercontent.com/a/default-user=s96-c",
-                })
-              }
-            >
-              <div className="google-account-avatar" style={{ background: "#ea4335" }}>M</div>
-              <div className="google-account-info">
-                <span className="google-account-name">Manjari</span>
-                <span className="google-account-email">manjari2700@gmail.com</span>
-              </div>
-            </button>
-          </div>
-
-          <div style={{ margin: "16px 0", borderTop: "1px solid #f1f5f9", paddingTop: "14px" }}>
-            <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "6px" }}>
-              Or use any Google account:
+            }}
+            style={{ marginBottom: "16px" }}
+          >
+            <label style={{ fontSize: "13px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "6px" }}>
+              Google Email Address
             </label>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <input
-                type="email"
-                placeholder="you@gmail.com"
-                value={customGoogleEmail}
-                onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: "1px solid #d1d5db",
-                  fontSize: "13px",
-                  background: "#f9fafb",
-                  color: "#111827"
-                }}
-              />
-              <button
-                type="button"
-                className="primary-button"
-                style={{ padding: "8px 14px", fontSize: "13px" }}
-                disabled={!customGoogleEmail.trim() || loading}
-                onClick={() => {
-                  if (customGoogleEmail.trim()) {
-                    handleGoogleLogin({
-                      email: customGoogleEmail.trim(),
-                      name: customGoogleEmail.split("@")[0],
-                    });
-                  }
-                }}
-              >
-                Continue
-              </button>
-            </div>
-          </div>
+            <input
+              type="email"
+              placeholder="name@gmail.com"
+              value={customGoogleEmail}
+              onChange={(e) => setCustomGoogleEmail(e.target.value)}
+              required
+              autoFocus
+              style={{
+                width: "100%",
+                padding: "11px 14px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+                background: "#f9fafb",
+                color: "#111827",
+                marginBottom: "14px",
+                boxSizing: "border-box"
+              }}
+            />
+            <button
+              type="submit"
+              className="primary-button full"
+              disabled={!customGoogleEmail.trim() || loading}
+            >
+              {loading ? "Signing in..." : "Continue with Google"}
+            </button>
+          </form>
 
           <button
             type="button"
