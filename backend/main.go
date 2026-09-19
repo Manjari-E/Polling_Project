@@ -66,6 +66,7 @@ func main() {
 			"X-Voter-ID",
 			"Accept",
 			"X-Requested-With",
+			"ngrok-skip-browser-warning",
 		},
 
 		ExposeHeaders: []string{
