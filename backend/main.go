@@ -45,40 +45,11 @@ func main() {
 	// CORS
 	// -----------------------------
 
-	allowedOrigins := []string{
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
-	}
-
-	frontendURL := strings.TrimSpace(
-		os.Getenv("FRONTEND_URL"),
-	)
-
-	if frontendURL != "" {
-		frontendURL = strings.TrimRight(
-			frontendURL,
-			"/",
-		)
-
-		found := false
-
-		for _, origin := range allowedOrigins {
-			if origin == frontendURL {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			allowedOrigins = append(
-				allowedOrigins,
-				frontendURL,
-			)
-		}
-	}
-
 	router.Use(cors.New(cors.Config{
-		AllowOrigins: allowedOrigins,
+		AllowOriginFunc: func(origin string) bool {
+			// Allow all origins (mobile browsers, Vercel deployments, etc.)
+			return true
+		},
 
 		AllowMethods: []string{
 			"GET",
@@ -92,6 +63,13 @@ func main() {
 			"Origin",
 			"Content-Type",
 			"Authorization",
+			"X-Voter-ID",
+			"Accept",
+			"X-Requested-With",
+		},
+
+		ExposeHeaders: []string{
+			"Content-Length",
 		},
 
 		AllowCredentials: true,

@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -19,29 +17,8 @@ var upgrader = websocket.Upgrader{
 }
 
 func checkWebSocketOrigin(r *http.Request) bool {
-	origin := strings.TrimSpace(r.Header.Get("Origin"))
-	if origin == "" {
-		return true
-	}
-
-	allowedOrigins := []string{
-		"http://localhost:5173",
-		"http://127.0.0.1:5173",
-	}
-
-	frontendURL := strings.TrimSpace(os.Getenv("FRONTEND_URL"))
-	if frontendURL != "" {
-		frontendURL = strings.TrimRight(frontendURL, "/")
-		allowedOrigins = append(allowedOrigins, frontendURL)
-	}
-
-	for _, allowed := range allowedOrigins {
-		if strings.TrimRight(origin, "/") == allowed {
-			return true
-		}
-	}
-
-	return false
+	// Allow all client origins (mobile devices, Vercel deployments, etc.) to connect to live WebSocket updates
+	return true
 }
 
 // Hub maintains the set of active clients and broadcasts messages.
