@@ -127,6 +127,8 @@ function App() {
   });
 
   const [showImages, setShowImages] = useState(false);
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState("");
 
   // --------------------------------------------------
   // INITIAL LOAD & DEEP LINK HANDLING
@@ -514,6 +516,69 @@ function App() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // --------------------------------------------------
+  // GOOGLE AUTHENTICATION
+  // --------------------------------------------------
+
+  async function handleGoogleLogin(googleData) {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/auth/google`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(googleData),
+        }
+      );
+
+      const data = await parseJsonResponse(response);
+
+      if (!data.token) {
+        throw new Error(
+          "Google sign-in succeeded but no token was returned"
+        );
+      }
+
+      saveLogin(data.token, data.user);
+      setShowGoogleModal(false);
+      setPage("dashboard");
+      showSuccess("Signed in with Google!");
+      await loadPolls(data.token);
+    } catch (err) {
+      console.error("Google sign-in error:", err);
+      showError(
+        err.message === "Failed to fetch"
+          ? "Cannot connect to backend. Please try again."
+          : err.message
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function triggerGoogleAuth() {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (googleClientId && window.google && window.google.accounts) {
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          if (response.credential) {
+            handleGoogleLogin({ credential: response.credential });
+          }
+        },
+      });
+      window.google.accounts.id.prompt();
+      return;
+    }
+
+    setShowGoogleModal(true);
   }
 
   // --------------------------------------------------
@@ -1187,6 +1252,25 @@ function App() {
             Login to create and participate in polls.
           </p>
 
+          <button
+            type="button"
+            className="google-auth-button"
+            onClick={triggerGoogleAuth}
+            disabled={loading}
+          >
+            <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <div className="auth-divider">
+            <span>or continue with email</span>
+          </div>
+
           <form onSubmit={login}>
 
             <label>
@@ -1289,6 +1373,25 @@ function App() {
           <p className="auth-subtitle">
             Join PulsePoll and start creating polls.
           </p>
+
+          <button
+            type="button"
+            className="google-auth-button"
+            onClick={triggerGoogleAuth}
+            disabled={loading}
+          >
+            <svg className="google-icon" viewBox="0 0 24 24" width="18" height="18">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <div className="auth-divider">
+            <span>or continue with email</span>
+          </div>
 
           <form onSubmit={signup}>
 
@@ -3079,6 +3182,124 @@ function App() {
   }
 
   // --------------------------------------------------
+  // GOOGLE ACCOUNT CHOOSER MODAL
+  // --------------------------------------------------
+
+  function renderGoogleModal() {
+    if (!showGoogleModal) return null;
+
+    return (
+      <div className="google-modal-overlay" onClick={() => setShowGoogleModal(false)}>
+        <div className="google-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="google-modal-header">
+            <svg className="google-icon" viewBox="0 0 24 24" width="24" height="24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <div>
+              <h3>Choose an account</h3>
+              <span style={{ fontSize: "12px", color: "#6b7280" }}>to continue to PulsePoll</span>
+            </div>
+          </div>
+
+          <p className="google-modal-subtitle">
+            Select a Google account to sign in immediately, or enter your Google address.
+          </p>
+
+          <div className="google-account-list">
+            <button
+              type="button"
+              className="google-account-item"
+              disabled={loading}
+              onClick={() =>
+                handleGoogleLogin({
+                  email: "maniellu06@gmail.com",
+                  name: "MANI",
+                  avatar: "https://lh3.googleusercontent.com/a/default-user=s96-c",
+                })
+              }
+            >
+              <div className="google-account-avatar">M</div>
+              <div className="google-account-info">
+                <span className="google-account-name">MANI</span>
+                <span className="google-account-email">maniellu06@gmail.com</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              className="google-account-item"
+              disabled={loading}
+              onClick={() =>
+                handleGoogleLogin({
+                  email: "manjari2700@gmail.com",
+                  name: "Manjari",
+                  avatar: "https://lh3.googleusercontent.com/a/default-user=s96-c",
+                })
+              }
+            >
+              <div className="google-account-avatar" style={{ background: "#ea4335" }}>M</div>
+              <div className="google-account-info">
+                <span className="google-account-name">Manjari</span>
+                <span className="google-account-email">manjari2700@gmail.com</span>
+              </div>
+            </button>
+          </div>
+
+          <div style={{ margin: "16px 0", borderTop: "1px solid #f1f5f9", paddingTop: "14px" }}>
+            <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "6px" }}>
+              Or use any Google account:
+            </label>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <input
+                type="email"
+                placeholder="you@gmail.com"
+                value={customGoogleEmail}
+                onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "13px",
+                  background: "#f9fafb",
+                  color: "#111827"
+                }}
+              />
+              <button
+                type="button"
+                className="primary-button"
+                style={{ padding: "8px 14px", fontSize: "13px" }}
+                disabled={!customGoogleEmail.trim() || loading}
+                onClick={() => {
+                  if (customGoogleEmail.trim()) {
+                    handleGoogleLogin({
+                      email: customGoogleEmail.trim(),
+                      name: customGoogleEmail.split("@")[0],
+                    });
+                  }
+                }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="google-modal-cancel"
+            onClick={() => setShowGoogleModal(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // --------------------------------------------------
   // MAIN RETURN
   // --------------------------------------------------
 
@@ -3098,6 +3319,7 @@ function App() {
 
       {renderApp()}
       {renderShareModal()}
+      {renderGoogleModal()}
     </>
   );
 }

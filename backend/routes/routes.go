@@ -15,6 +15,7 @@ func SetupRoutes(router *gin.Engine) {
 	{
 		auth.POST("/signup", handlers.Signup)
 		auth.POST("/login", handlers.Login)
+		auth.POST("/google", handlers.GoogleAuth)
 	}
 
 	// Polls
