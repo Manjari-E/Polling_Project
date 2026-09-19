@@ -129,6 +129,10 @@ function App() {
   const [showImages, setShowImages] = useState(false);
   const [showGoogleModal, setShowGoogleModal] = useState(false);
   const [customGoogleEmail, setCustomGoogleEmail] = useState("");
+  const [googleClientIdInput, setGoogleClientIdInput] = useState(
+    () => localStorage.getItem("pulsepoll_google_client_id") || import.meta.env.VITE_GOOGLE_CLIENT_ID || ""
+  );
+  const [googleAuthTab, setGoogleAuthTab] = useState("oauth");
 
   // --------------------------------------------------
   // INITIAL LOAD & DEEP LINK HANDLING
@@ -564,10 +568,51 @@ function App() {
   }
 
   function triggerGoogleAuth() {
-    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (googleClientId && window.google && window.google.accounts) {
+    const activeClientId =
+      localStorage.getItem("pulsepoll_google_client_id") ||
+      import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+      "";
+
+    if (activeClientId && window.google?.accounts?.oauth2) {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: activeClientId,
+        scope: "email profile openid",
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            try {
+              setLoading(true);
+              const userinfoRes = await fetch(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                {
+                  headers: {
+                    Authorization: `Bearer ${tokenResponse.access_token}`,
+                  },
+                }
+              );
+              const profile = await userinfoRes.json();
+              if (profile && profile.email) {
+                await handleGoogleLogin({
+                  email: profile.email,
+                  name: profile.name || profile.email.split("@")[0],
+                  avatar: profile.picture || "",
+                });
+              }
+            } catch (err) {
+              console.error("Google user profile fetch error:", err);
+              showError("Failed to retrieve Google profile.");
+            } finally {
+              setLoading(false);
+            }
+          }
+        },
+      });
+      client.requestAccessToken();
+      return;
+    }
+
+    if (activeClientId && window.google?.accounts?.id) {
       window.google.accounts.id.initialize({
-        client_id: googleClientId,
+        client_id: activeClientId,
         callback: (response) => {
           if (response.credential) {
             handleGoogleLogin({ credential: response.credential });
@@ -3199,57 +3244,148 @@ function App() {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
             </svg>
             <div>
-              <h3>Choose an account</h3>
-              <span style={{ fontSize: "12px", color: "#6b7280" }}>to continue to PulsePoll</span>
+              <h3>Official Google Authentication</h3>
+              <span style={{ fontSize: "12px", color: "#6b7280" }}>Sign in to PulsePoll with Google</span>
             </div>
           </div>
 
-          <p className="google-modal-subtitle">
-            Enter your Google email address to sign in to PulsePoll.
-          </p>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (customGoogleEmail.trim()) {
-                handleGoogleLogin({
-                  email: customGoogleEmail.trim(),
-                  name: customGoogleEmail.split("@")[0],
-                });
-              }
-            }}
-            style={{ marginBottom: "16px" }}
-          >
-            <label style={{ fontSize: "13px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "6px" }}>
-              Google Email Address
-            </label>
-            <input
-              type="email"
-              placeholder="name@gmail.com"
-              value={customGoogleEmail}
-              onChange={(e) => setCustomGoogleEmail(e.target.value)}
-              required
-              autoFocus
-              style={{
-                width: "100%",
-                padding: "11px 14px",
-                borderRadius: "10px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-                background: "#f9fafb",
-                color: "#111827",
-                marginBottom: "14px",
-                boxSizing: "border-box"
-              }}
-            />
+          <div style={{ display: "flex", gap: "6px", marginBottom: "16px", background: "#f1f5f9", padding: "4px", borderRadius: "8px" }}>
             <button
-              type="submit"
-              className="primary-button full"
-              disabled={!customGoogleEmail.trim() || loading}
+              type="button"
+              onClick={() => setGoogleAuthTab("oauth")}
+              style={{
+                flex: 1,
+                padding: "8px",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                background: googleAuthTab === "oauth" ? "#ffffff" : "transparent",
+                color: googleAuthTab === "oauth" ? "#1e293b" : "#64748b",
+                boxShadow: googleAuthTab === "oauth" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+              }}
             >
-              {loading ? "Signing in..." : "Continue with Google"}
+              Google OAuth 2.0 Popup
             </button>
-          </form>
+            <button
+              type="button"
+              onClick={() => setGoogleAuthTab("direct")}
+              style={{
+                flex: 1,
+                padding: "8px",
+                border: "none",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: "pointer",
+                background: googleAuthTab === "direct" ? "#ffffff" : "transparent",
+                color: googleAuthTab === "direct" ? "#1e293b" : "#64748b",
+                boxShadow: googleAuthTab === "direct" ? "0 1px 3px rgba(0,0,0,0.1)" : "none"
+              }}
+            >
+              Direct Google Sign-in
+            </button>
+          </div>
+
+          {googleAuthTab === "oauth" ? (
+            <div style={{ marginBottom: "16px" }}>
+              <p style={{ fontSize: "13.5px", color: "#475569", lineHeight: "1.5", marginBottom: "12px" }}>
+                To launch Google&apos;s authentic sign-in popup window, Google requires an OAuth Client ID from Google Cloud Console:
+              </p>
+
+              <label style={{ fontSize: "12.5px", fontWeight: 600, color: "#334155", display: "block", marginBottom: "6px" }}>
+                Your Google OAuth Client ID:
+              </label>
+              <input
+                type="text"
+                placeholder="xxxx.apps.googleusercontent.com"
+                value={googleClientIdInput}
+                onChange={(e) => setGoogleClientIdInput(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e1",
+                  fontSize: "13px",
+                  background: "#f8fafc",
+                  color: "#0f172a",
+                  marginBottom: "12px",
+                  boxSizing: "border-box"
+                }}
+              />
+
+              <button
+                type="button"
+                className="primary-button full"
+                disabled={!googleClientIdInput.trim() || loading}
+                onClick={() => {
+                  const cleaned = googleClientIdInput.trim();
+                  if (cleaned) {
+                    localStorage.setItem("pulsepoll_google_client_id", cleaned);
+                    setShowGoogleModal(false);
+                    triggerGoogleAuth();
+                  }
+                }}
+              >
+                Launch Google Sign-In Popup →
+              </button>
+
+              <div style={{ marginTop: "14px", padding: "10px 12px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px", color: "#64748b", lineHeight: "1.5" }}>
+                <strong>How to get this ID in 2 minutes:</strong>
+                <ol style={{ margin: "6px 0 0 18px", padding: 0 }}>
+                  <li>Go to <code>console.cloud.google.com/apis/credentials</code></li>
+                  <li>Click <strong>Create Credentials</strong> → <strong>OAuth Client ID</strong></li>
+                  <li>Application type: <strong>Web application</strong></li>
+                  <li>Add Authorized JS Origin: <code>https://pulsepoll-five.vercel.app</code></li>
+                  <li>Copy the Client ID and paste it above!</li>
+                </ol>
+              </div>
+            </div>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (customGoogleEmail.trim()) {
+                  handleGoogleLogin({
+                    email: customGoogleEmail.trim(),
+                    name: customGoogleEmail.split("@")[0],
+                  });
+                }
+              }}
+              style={{ marginBottom: "16px" }}
+            >
+              <label style={{ fontSize: "13px", fontWeight: 600, color: "#374151", display: "block", marginBottom: "6px" }}>
+                Google Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="name@gmail.com"
+                value={customGoogleEmail}
+                onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                required
+                autoFocus
+                style={{
+                  width: "100%",
+                  padding: "11px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #d1d5db",
+                  fontSize: "14px",
+                  background: "#f9fafb",
+                  color: "#111827",
+                  marginBottom: "14px",
+                  boxSizing: "border-box"
+                }}
+              />
+              <button
+                type="submit"
+                className="primary-button full"
+                disabled={!customGoogleEmail.trim() || loading}
+              >
+                {loading ? "Signing in..." : "Continue with Google"}
+              </button>
+            </form>
+          )}
 
           <button
             type="button"
